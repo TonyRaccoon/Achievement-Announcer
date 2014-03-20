@@ -1,4 +1,4 @@
-achievement-announcer
+Achievement Announcer
 =====================
 
-World of Warcraft addon that announces to desired channels (party, guild, etc.) whenever you get an achievement
+A World of Warcraft addon that announces to desired channels (party, raid, etc.) whenever you get an achievement
