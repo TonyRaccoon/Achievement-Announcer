@@ -1,214 +1,225 @@
---[[
-	1.0   Initial release
-	1.01  Removed : from default output message
-	1.02  Updated for 5.0.4
-	1.1   Added custom channel support
-	1.11  Added option to control whether guild achievements are announced
-	1.12  Updated TOC version to 5.1
-	1.13  Updated TOC version to 5.2
-	1.14  Updated TOC version to 5.3
-	1.15  Updated TOC version to 5.4
-]]
+ACAN = {}
+ACAN.version = GetAddOnMetadata("AchievementAnnouncer","Version")
+ACAN.date = GetAddOnMetadata("AchievementAnnouncer","X-Date")
 
-function AA_OnLoad(self) -- Run when game loads up
+ACAN.default_settings = {
+	string = "has earned the achievement %a!",
+	party = true,
+	raid = false,
+	announce_guild_achievements = false,
+	custom_channels = ""
+}
+
+--- Events ---
+
+function ACAN.OnLoad(self)					-- Fired on game load
 	self:RegisterEvent("ADDON_LOADED")
 	self:RegisterEvent("ACHIEVEMENT_EARNED")
-	AA_Version = GetAddOnMetadata("AchievementAnnouncer","Version")
-	SLASH_AA1, SLASH_AA2 = '/aa', '/achievementannouncer'
+	
+	SLASH_ACAN1, SLASH_ACAN2 = '/aa', '/achievementannouncer'
+	SlashCmdList["ACAN"] = ACAN.OnCommand
 end
 
-function AA_OnEvent(self, event, ...) -- When an event is fired
-	if (event == "ACHIEVEMENT_EARNED") then
+function ACAN.OnEvent(self, event, ...)		-- Fired when a registered event is fired
+	if event == "ACHIEVEMENT_EARNED" then
 		local achID = ...
 		local achLink = GetAchievementLink(achID)
 		local _,_,_,_,_,_,_,_,_,_,_,isGuildAch = GetAchievementInfo(achID)
 		
-		if (isGuildAch==true and AA_Settings["Guild"] == 1) or isGuildAch==false then
-			if (GetNumSubgroupMembers() > 0 and IsInRaid() == false and AA_Settings["Party"] == 1) then -- in a party and not in a raid
-				if ((HasLFGRestrictions() == true and AA_Settings["RandomParty"] == 1) or HasLFGRestrictions() == false) then
-					SendChatMessage(AA_Str(achLink), "PARTY")
-				end
-			end
-			
-			if (GetNumGroupMembers() > 1 and IsInRaid() == true and AA_Settings["Raid"] == 1) then -- in a raid
-				if ((HasLFGRestrictions() == true and AA_Settings["RandomRaid"] == 1) or HasLFGRestrictions() == false) then
-					SendChatMessage(AA_Str(achLink), "RAID")
-				end
-			end
-			
-			if (AA_Settings["Say"] == 1) then
-				SendChatMessage(AA_Str(achLink), "SAY")
-			end
-			
-			if (AA_Settings["CustomChannels"] ~= "") then
-				local channels = { strsplit(",",string.gsub(AA_Settings["CustomChannels"],"%s+","")) }
-				for _,v in pairs(channels) do
-					local id = GetChannelName(v)
-					if id then
-						SendChatMessage(AA_Str(achLink), "CHANNEL", nil, id)
-					end
+		if isGuildAch and not AA_Settings.announce_guild_achievements then return end -- Don't announce guild achievements if not enabled
+		
+		if AA_Settings.raid and IsInRaid() and GetNumGroupMembers(LE_PARTY_CATEGORY_HOME) > 1 then -- if announce to raid, in raid, and not queued up alone (if in LFR)
+			SendChatMessage(ACAN.GetOutputString(achLink), "RAID")
+		elseif AA_Settings.party and GetNumGroupMembers(LE_PARTY_CATEGORY_HOME) > 1 then -- if announce to party, in party, and not queued up alone (if in LFG)
+			SendChatMessage(ACAN.GetOutputString(achLink), "PARTY")
+		end
+		
+		if AA_Settings.custom_channels ~= "" then
+			local channels = { strsplit(",",AA_Settings.custom_channels:gsub("%s+","")) }
+			for _,v in pairs(channels) do
+				local id,name = GetChannelName(v)
+				if id and not name:find("^Trade - ") and not name:find("^General - ") and not name:find("^LocalDefense - ") then -- No Trade, General, or LocalDefense
+					SendChatMessage(ACAN.GetOutputString(achLink), "CHANNEL", nil, id)
 				end
 			end
 		end
 		
-	elseif (event == "ADDON_LOADED") then
+	elseif event == "ADDON_LOADED" then
 		local addonName = ...
-		if (addonName == "AchievementAnnouncer") then
-			AA_Options:Hide()
+		
+		if addonName == "AchievementAnnouncer" then
+			AA_Options:Hide() -- Blizzard bug: Options won't trigger OnShow unless you explicitly hide it first
+			if not AA_Settings then AA_Settings = ACAN.default_settings end
+			ACAN.ImportOlderSettings()
+			AA_Settings.version = ACAN.version
 			
-			if (AA_Settings == nil) then 				AA_Settings = {} end
-			if (AA_Settings["Party"] == nil) then 		AA_Settings["Party"] = 1 end
-			if (AA_Settings["RandomParty"] == nil) then	AA_Settings["RandomParty"] = 0 end
-			if (AA_Settings["Raid"] == nil) then		AA_Settings["Raid"] = 0 end
-			if (AA_Settings["RandomRaid"] == nil) then	AA_Settings["RandomRaid"] = 0 end
-			if (AA_Settings["Say"] == nil) then			AA_Settings["Say"] = 0 end
-			if (AA_Settings["String"] == nil) then		AA_Settings["String"] = "has earned the achievement %a!" end
-			if (AA_Settings["CustomChannels"] == nil) then AA_Settings["CustomChannels"] = "" end
-			if (AA_Settings["Guild"] == nil) then		AA_Settings["Guild"] = 0 end
+			ACAN.InitializeWidgets()
 		end
 	end
 end
 
-function AA_Msg(msg) -- Sends a formatted message to the chat frame
+function ACAN.OnCommand(cmd)				-- Fired on slash command
+	if cmd == "v" or cmd == "ver" or cmd == "version" then
+		ACAN.Msg(format("Version: %s (%s)", ACAN.version, ACAN.date))
+	else
+		InterfaceOptionsFrame_OpenToCategory("Achiev. Announcer")
+		InterfaceOptionsFrame_OpenToCategory("Achiev. Announcer") -- Blizzard bug: Requires two calls to actually open to the correct panel
+	end
+end
+
+--- Main functions ---
+
+function ACAN.Msg(msg)						-- Sends a formatted message to the chat frame
 	DEFAULT_CHAT_FRAME:AddMessage("|cffd2b48c[AchievementAnnouncer]|r "..msg)
 end
 
-local function AA_Slash(cmd) -- Slash command handler
-	if (cmd == "v" or cmd == "ver" or cmd == "version") then
-		AA_Msg("Version: "..AA_Version)
+function ACAN.GetOutputString(ach)			-- Returns the string to be sent
+	if AA_Settings.string == "" then
+		return ACAN.default_settings.string:gsub("%%a", ach)
 	else
-		InterfaceOptionsFrame_OpenToCategory("AchievementAnnouncer")
+		return AA_Settings.string:gsub("%%a", ach)
 	end
 end
 
-function AA_Test(id)
-	if id == nil then id = 123 end
-	AA_OnEvent(self, "ACHIEVEMENT_EARNED", id)
-end
-
-function AA_Str(ach) -- Returns the string to be sent
-	if AA_Settings["String"] == "" or AA_Settings["String"] == nil then
-		return string.gsub("has earned the achievement %a!", "%%a", ach)
-	else
-		return string.gsub(AA_Settings["String"], "%%a", ach)
+function ACAN.ImportOlderSettings()			-- Converts old settings
+	if not AA_Settings.version then
+		if AA_Settings.Party then
+			AA_Settings.party = (AA_Settings.RandomParty and true or false)
+		end
+		
+		if AA_Settings.Raid then
+			AA_Settings.raid = (AA_Settings.Raid and true or false)
+		end
+		
+		if AA_Settings.Guild then
+			AA_Settings.announce_guild_achievements = (AA_Settings.Guild and true or false)
+		end
+		
+		if AA_Settings.CustomChannels then
+			if AA_Settings.CustomChannels == "" or not AA_Settings.CustomChannels then
+				AA_Settings.custom_channels = ""
+			else
+				AA_Settings.custom_channels = AA_Settings.CustomChannels
+			end
+		end
+		
+		if AA_Settings.String then
+			if AA_Settings.String == "" or not AA_Settings.String then
+				AA_Settings.string = "has earned the achievement %a!"
+			else
+				AA_Settings.string = AA_Settings.String
+			end
+		end
+		
+		AA_Settings.Party = nil
+		AA_Settings.RandomParty = nil
+		AA_Settings.Raid = nil
+		AA_Settings.RandomRaid = nil
+		AA_Settings.Guild = nil
+		AA_Settings.Say = nil
+		AA_Settings.CustomChannels = nil
+		AA_Settings.String = nil
+		AA_Settings.BG = nil
 	end
 end
 
--- UI STUFF --
+--- UI functions ---
 
-function AA_OptionsLoad(self) -- Initialize Options panel
-	self.name = "AchievementAnnouncer"
-	self.default = AA_Defaults
-	InterfaceOptions_AddCategory(self)
-	self.okay = function(self) AA_OptionsOkay() end
-end
-
-function AA_Defaults()
-	AA_OptBut_Party:SetChecked(1)
-	AA_OptBut_RandomParty:SetChecked(0)
-	AA_OptBut_Raid:SetChecked(0)
-	AA_OptBut_RandomRaid:SetChecked(0)
-	AA_OptBut_Say:SetChecked(0)
-	AA_OptBut_Guild:SetChecked(0)
-	AA_Opt_String:SetText("has earned the achievement %a!")
-	AA_Opt_CustomChannels:SetText("")
-	
-	AA_Settings["Party"] = 1
-	AA_Settings["RandomParty"] = 0
-	AA_Settings["Raid"] = 0
-	AA_Settings["RandomRaid"] = 0
-	AA_Settings["Say"] = 0
-	AA_Settings["Guild"] = 0
-	AA_Settings["String"] = "has earned the achievement %a!"
-	AA_Settings["CustomChannels"] = ""
-	
-	AA_OptBut_RandomParty:Enable()
-	AA_OptBut_RandomRaid:Disable()
+function ACAN.InitializeWidgets()			-- Initializes options UI widgets
+	AA_OptBut_Party:SetChecked(AA_Settings.party)
+	AA_OptBut_Raid:SetChecked(AA_Settings.raid)
+	AA_OptBut_Guild:SetChecked(AA_Settings.announce_guild_achievements)
+	AA_Opt_String:SetText(AA_Settings.string)
+	AA_Opt_CustomChannels:SetText(AA_Settings.custom_channels)
 	
 	AA_Opt_String:ClearFocus()
 	AA_Opt_CustomChannels:ClearFocus()
 end
 
-function AA_OptionsShow() -- Fired when options panel opens
+--- UI events ---
+
+function ACAN.OnOptionsLoaded(self)			-- Initialize Options panel
+	self.name = "Achiev. Announcer"
+	self.default = ACAN.OnDefaultsClicked
+	InterfaceOptions_AddCategory(self)
+	self.okay = ACAN.OnOptionsOkayClicked
+end
+
+function ACAN.OnOptionsShown()				-- Fired when options panel opens
 	
 end
 
-function AA_OptionsHide() -- Fired when options panel closes
+function ACAN.OnOptionsHidden()				-- Fired when options panel closes
 	
 end
 
-function AA_OptionsOkay() -- Fired when "Okay" in options panel is pressed
-	AA_Settings["String"] = AA_Opt_String:GetText()
-	AA_Settings["CustomChannels"] = AA_Opt_CustomChannels:GetText()
+function ACAN.OnDefaultsClicked()			-- Fired when "Defaults" button is pressed
+	AA_Settings = ACAN.deepcopy(ACAN.default_settings)
+	AA_Settings.version = ACAN.version
+	ACAN.InitializeWidgets()
 end
 
-function AA_ButtonClick(self) -- Fired when an options panel widget is used
-	if (self:GetObjectType() ~= "Slider") then
-		PlaySound("igMainMenuOptionCheckBoxOn")
-	end
+function ACAN.OnOptionsOkayClicked()		-- Fired when "Okay" is clicked
+	AA_Settings.string = AA_Opt_String:GetText()
+	AA_Settings.custom_channels = AA_Opt_CustomChannels:GetText()
+end
+
+function ACAN.OnWidgetUsed(self)			-- Fired when an options panel widget is used
+	PlaySound("igMainMenuOptionCheckBoxOn")
 	
-	if (self:GetName() == "AA_OptBut_Party") then
-		if (AA_OptBut_Party:GetChecked()) then
-			AA_Settings["Party"] = 1
-		else
-			AA_Settings["Party"] = 0
-		end
-	elseif (self:GetName() == "AA_OptBut_Raid") then
-		if (AA_OptBut_Raid:GetChecked()) then
-			AA_Settings["Raid"] = 1
-		else
-			AA_Settings["Raid"] = 0
-		end
-	elseif (self:GetName() == "AA_OptBut_RandomParty") then
-		if (AA_OptBut_RandomParty:GetChecked()) then
-			AA_Settings["RandomParty"] = 1
-		else
-			AA_Settings["RandomParty"] = 0
-		end
-	elseif (self:GetName() == "AA_OptBut_RandomRaid") then
-		if (AA_OptBut_RandomRaid:GetChecked()) then
-			AA_Settings["RandomRaid"] = 1
-		else
-			AA_Settings["RandomRaid"] = 0
-		end
-	elseif (self:GetName() == "AA_OptBut_Say") then
-		if (AA_OptBut_Say:GetChecked()) then
-			AA_Settings["Say"] = 1
-		else
-			AA_Settings["Say"] = 0
-		end
-	elseif (self:GetName() == "AA_OptBut_Guild") then
-		if (AA_OptBut_Guild:GetChecked()) then
-			AA_Settings["Guild"] = 1
-		else
-			AA_Settings["Guild"] = 0
-		end
+	if self:GetName() == "AA_OptBut_Party" then
+		AA_Settings.party = (self:GetChecked() and true or false)
+	
+	elseif self:GetName() == "AA_OptBut_Raid" then
+		AA_Settings.raid = (self:GetChecked() and true or false)
+	
+	elseif self:GetName() == "AA_OptBut_Guild" then
+		AA_Settings.announce_guild_achievements = (self:GetChecked() and true or false)
+	
+	elseif self:GetName() == "AA_OptBut_DefaultString" then
+		AA_Opt_String:SetText(ACAN.default_settings.string)
+	
 	end
 end
 
-function AA_EditBox_Focus(self)
-	prevString = self:GetText()
+function ACAN.OnEditboxFocused(self)		-- Fired when an editbox is focused
+	self.previous_value = self:GetText()
 end
-function AA_EditBox_Enter(self)
+
+function ACAN.OnEditboxEnterPressed(self)	-- Fired when Enter is pressed in an editbox
 	self:ClearFocus()
-	AA_Settings["String"] = self:GetText()
+	if self:GetName() == "AA_Opt_String" then
+		AA_Settings.string = self:GetText()
+	elseif self:GetName() == "AA_Opt_CustomChannels" then
+		AA_Settings.custom_channels = self:GetText()
+	end
 end
-function AA_EditBox_Escape(self)
-	self:SetText(prevString)
+
+function ACAN.OnEditboxEscapePressed(self)	-- Fired when Escape is pressed in an editbox
+	self:SetText(self.previous_value)
 	self:ClearFocus()
 end
 
+--- Debug functions ---
 
-function AA_EditBox2_Focus(self)
-	prevString2 = self:GetText()
-end
-function AA_EditBox2_Enter(self)
-	self:ClearFocus()
-	AA_Settings["CustomChannels"] = self:GetText()
-end
-function AA_EditBox2_Escape(self)
-	self:SetText(prevString2)
-	self:ClearFocus()
+function ACAN.test(id)						-- Generate a fake achievement
+	if id == nil then id = 123 end
+	ACAN.OnEvent(self, "ACHIEVEMENT_EARNED", id)
 end
 
-SlashCmdList["AA"] = AA_Slash
+--- Miscellaneous functions ---
+
+function ACAN.deepcopy(orig)				-- Clone a table
+    local orig_type = type(orig)
+    local copy
+    if orig_type == 'table' then
+        copy = {}
+        for orig_key, orig_value in next, orig, nil do
+            copy[ACAN.deepcopy(orig_key)] = ACAN.deepcopy(orig_value)
+        end
+        setmetatable(copy, ACAN.deepcopy(getmetatable(orig)))
+    else -- number, string, boolean, etc
+        copy = orig
+    end
+    return copy
+end

@@ -1,21 +1,20 @@
 <Ui xmlns="http://www.blizzard.com/wow/ui/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.blizzard.com/wow/ui/ ..\..\FrameXML\UI.xsd">
-	<Script File="AchievementAnnouncer.lua"/>
 	<Frame name="AchievementAnnouncerFrame">
 		<Scripts>
 			<OnLoad>
-				AA_OnLoad(self);
+				ACAN.OnLoad(self);
 			</OnLoad>
 			<OnEvent>
-				AA_OnEvent(self, event, ...);
+				ACAN.OnEvent(self, event, ...);
 			</OnEvent>
 		</Scripts>
 	</Frame>
 	
 	<Frame name="AA_Options" hidden="false" toplevel="true" frameStrata="DIALOG">
 		<Scripts>
-			<OnLoad>AA_OptionsLoad(self)</OnLoad>
-			<OnShow>if (AA_Settings) then AA_OptionsShow() end</OnShow>
-			<OnHide>if (AA_Settings) then AA_OptionsHide() end</OnHide>
+			<OnLoad>ACAN.OnOptionsLoaded(self)</OnLoad>
+			<OnShow>if AA_Settings then ACAN.OnOptionsShown() end</OnShow>
+			<OnHide>if AA_Settings then ACAN.OnOptionsHidden() end</OnHide>
 		</Scripts>
 		<Layers>
 			<Layer level="ARTWORK">
@@ -37,118 +36,57 @@
 				<FontString name="AA_Opt_CustomChannelsTitle" text="Custom channels, separated by commas" inherits="GameFontNormal" justifyH="LEFT" justifyV="TOP">
 					<Anchors>
 						<Anchor point="TOPLEFT" relativeTo="AA_Opt_Subtitle" relativePoint="BOTTOMLEFT">
-							<Offset><AbsDimension x="0" y="-174"/></Offset>
+							<Offset><AbsDimension x="0" y="-120"/></Offset>
 						</Anchor>
 					</Anchors>
 				</FontString>
 				
-				<FontString name="AA_Opt_Stringtitle" text="Output String (%a is replaced with the earned achievement)" inherits="GameFontNormal" justifyH="LEFT" justifyV="TOP">
+				<FontString name="AA_Opt_StringTitle" text="Output String (%a is replaced with the earned achievement)" inherits="GameFontNormal" justifyH="LEFT" justifyV="TOP">
 					<Anchors>
 						<Anchor point="TOPLEFT" relativeTo="AA_Opt_Subtitle" relativePoint="BOTTOMLEFT">
-							<Offset><AbsDimension x="0" y="-228"/></Offset>
+							<Offset><AbsDimension x="0" y="-170"/></Offset>
 						</Anchor>
 					</Anchors>
 				</FontString>
 			</Layer>
 		</Layers>
 		<Frames>
-			<Checkbutton name="AA_OptBut_Say" inherits="OptionsCheckButtonTemplate">
-				<Anchors>
-					<Anchor point="TOPLEFT" relativeTo="AA_Opt_Subtitle" relativePoint="BOTTOMLEFT">
-						<Offset><AbsDimension x="0" y="-16"/></Offset>
-					</Anchor>
-				</Anchors>
-				<Scripts>
-					<OnShow>if (AA_Settings) then self:SetChecked(AA_Settings["Say"]) end</OnShow>
-					<OnLoad>_G[self:GetName().."Text"]:SetText("Send to Say")</OnLoad>
-					<OnClick>AA_ButtonClick(self)</OnClick>
-				</Scripts>
-			</Checkbutton>
-			
 			<Checkbutton name="AA_OptBut_Party" inherits="OptionsCheckButtonTemplate">
 				<Anchors>
 					<Anchor point="TOPLEFT" relativeTo="AA_Opt_Subtitle" relativePoint="BOTTOMLEFT">
-						<Offset><AbsDimension x="0" y="-40"/></Offset>
+						<Offset><AbsDimension x="0" y="-10"/></Offset>
 					</Anchor>
 				</Anchors>
 				<Scripts>
-					<OnShow>if (AA_Settings) then self:SetChecked(AA_Settings["Party"]) end</OnShow>
+					<OnShow>if AA_Settings then self:SetChecked(AA_Settings.party) end</OnShow>
 					<OnLoad>_G[self:GetName().."Text"]:SetText("Send to Party")</OnLoad>
-					<OnClick>
-						AA_ButtonClick(self)
-						if (self:GetChecked() == 1) then AA_OptBut_RandomParty:Enable() else AA_OptBut_RandomParty:Disable() end
-					</OnClick>
-				</Scripts>
-			</Checkbutton>
-			
-			<Checkbutton name="AA_OptBut_RandomParty" inherits="OptionsCheckButtonTemplate">
-				<Anchors>
-					<Anchor point="TOPLEFT" relativeTo="AA_Opt_Subtitle" relativePoint="BOTTOMLEFT">
-						<Offset><AbsDimension x="16" y="-60"/></Offset>
-					</Anchor>
-				</Anchors>
-				<Scripts>
-					<OnShow>
-						if (AA_Settings) then
-							self:SetChecked(AA_Settings["RandomParty"])
-							if (AA_Settings["Party"] == 0) then self:Disable() end
-						end
-					</OnShow>
-					<OnLoad>_G[self:GetName().."Text"]:SetText("Even LFG Parties")</OnLoad>
-					<OnClick>AA_ButtonClick(self)</OnClick>
-					<OnDisable>_G[self:GetName().."Text"]:SetTextColor(.5,.5,.5)</OnDisable>
-					<OnEnable>_G[self:GetName().."Text"]:SetTextColor(1,.82,0)</OnEnable>
+					<OnClick>ACAN.OnWidgetUsed(self)</OnClick>
 				</Scripts>
 			</Checkbutton>
 			
 			<Checkbutton name="AA_OptBut_Raid" inherits="OptionsCheckButtonTemplate">
 				<Anchors>
 					<Anchor point="TOPLEFT" relativeTo="AA_Opt_Subtitle" relativePoint="BOTTOMLEFT">
-						<Offset><AbsDimension x="0" y="-88"/></Offset>
+						<Offset><AbsDimension x="0" y="-40"/></Offset>
 					</Anchor>
 				</Anchors>
 				<Scripts>
-					<OnShow>if (AA_Settings) then self:SetChecked(AA_Settings["Raid"]) end</OnShow>
+					<OnShow>if AA_Settings then self:SetChecked(AA_Settings.raid) end</OnShow>
 					<OnLoad>_G[self:GetName().."Text"]:SetText("Send to Raid")</OnLoad>
-					<OnClick>
-						AA_ButtonClick(self)
-						if (self:GetChecked() == 1) then AA_OptBut_RandomRaid:Enable() else AA_OptBut_RandomRaid:Disable() end
-					</OnClick>
-				</Scripts>
-			</Checkbutton>
-			
-			<Checkbutton name="AA_OptBut_RandomRaid" inherits="OptionsCheckButtonTemplate">
-				<Anchors>
-					<Anchor point="TOPLEFT" relativeTo="AA_Opt_Subtitle" relativePoint="BOTTOMLEFT">
-						<Offset><AbsDimension x="16" y="-108"/></Offset>
-					</Anchor>
-				</Anchors>
-				<Scripts>
-					<OnShow>
-						if (AA_Settings) then
-							self:SetChecked(AA_Settings["RandomRaid"])
-							if (AA_Settings["Raid"] == 0) then self:Disable() end
-						end
-					</OnShow>
-					<OnLoad>_G[self:GetName().."Text"]:SetText("Even LFR Raids")</OnLoad>
-					<OnClick>AA_ButtonClick(self)</OnClick>
-					<OnDisable>_G[self:GetName().."Text"]:SetTextColor(.5,.5,.5)</OnDisable>
-					<OnEnable>_G[self:GetName().."Text"]:SetTextColor(1,.82,0)</OnEnable>
+					<OnClick>ACAN.OnWidgetUsed(self)</OnClick>
 				</Scripts>
 			</Checkbutton>
 			
 			<Checkbutton name="AA_OptBut_Guild" inherits="OptionsCheckButtonTemplate">
 				<Anchors>
 					<Anchor point="TOPLEFT" relativeTo="AA_Opt_Subtitle" relativePoint="BOTTOMLEFT">
-						<Offset><AbsDimension x="0" y="-133"/></Offset>
+						<Offset><AbsDimension x="0" y="-70"/></Offset>
 					</Anchor>
 				</Anchors>
 				<Scripts>
-					<OnShow>if (AA_Settings) then self:SetChecked(AA_Settings["Guild"]) end</OnShow>
+					<OnShow>if AA_Settings then self:SetChecked(AA_Settings.announce_guild_achievements) end</OnShow>
 					<OnLoad>_G[self:GetName().."Text"]:SetText("Announce guild achievements")</OnLoad>
-					<OnClick>
-						AA_ButtonClick(self)
-					</OnClick>
+					<OnClick>ACAN.OnWidgetUsed(self)</OnClick>
 				</Scripts>
 			</Checkbutton>
 			
@@ -157,15 +95,15 @@
 					<AbsDimension x="250" y="32"></AbsDimension>
 				</Size>
 				<Anchors>
-					<Anchor point="TOPLEFT" relativeTo="AA_Opt_Subtitle" relativePoint="BOTTOMLEFT">
-						<Offset><AbsDimension x="8" y="-184"/></Offset>
+					<Anchor point="TOPLEFT" relativeTo="AA_Opt_CustomChannelsTitle" relativePoint="BOTTOMLEFT">
+						<Offset><AbsDimension x="8" y="0"/></Offset>
 					</Anchor>
 				</Anchors>
 				<Scripts>
-					<OnShow>if (AA_Settings) then self:SetText(AA_Settings["CustomChannels"]) end</OnShow>
-					<OnEnterPressed>AA_EditBox2_Enter(self)</OnEnterPressed>
-					<OnEscapePressed>AA_EditBox2_Escape(self)</OnEscapePressed>
-					<OnEditFocusGained>AA_EditBox2_Focus(self)</OnEditFocusGained>
+					<OnShow>if AA_Settings then self:SetText(AA_Settings.custom_channels) end</OnShow>
+					<OnEnterPressed>ACAN.OnEditboxEnterPressed(self)</OnEnterPressed>
+					<OnEscapePressed>ACAN.OnEditboxEscapePressed(self)</OnEscapePressed>
+					<OnEditFocusGained>ACAN.OnEditboxFocused(self)</OnEditFocusGained>
 				</Scripts>
 			</EditBox>
 			
@@ -174,15 +112,15 @@
 					<AbsDimension x="250" y="32"></AbsDimension>
 				</Size>
 				<Anchors>
-					<Anchor point="TOPLEFT" relativeTo="AA_Opt_Subtitle" relativePoint="BOTTOMLEFT">
-						<Offset><AbsDimension x="8" y="-238"/></Offset>
+					<Anchor point="TOPLEFT" relativeTo="AA_Opt_StringTitle" relativePoint="BOTTOMLEFT">
+						<Offset><AbsDimension x="8" y="0"/></Offset>
 					</Anchor>
 				</Anchors>
 				<Scripts>
-					<OnShow>if (AA_Settings) then self:SetText(AA_Settings["String"]) end</OnShow>
-					<OnEnterPressed>AA_EditBox_Enter(self)</OnEnterPressed>
-					<OnEscapePressed>AA_EditBox_Escape(self)</OnEscapePressed>
-					<OnEditFocusGained>AA_EditBox_Focus(self)</OnEditFocusGained>
+					<OnShow>if AA_Settings then self:SetText(AA_Settings.string) end</OnShow>
+					<OnEnterPressed>ACAN.OnEditboxEnterPressed(self)</OnEnterPressed>
+					<OnEscapePressed>ACAN.OnEditboxEscapePressed(self)</OnEscapePressed>
+					<OnEditFocusGained>ACAN.OnEditboxFocused(self)</OnEditFocusGained>
 				</Scripts>
 			</EditBox>
 			
@@ -194,7 +132,7 @@
 					</Anchor>
 				</Anchors>
 				<Scripts>
-					<OnClick>PlaySound("igMainMenuOptionCheckBoxOn") AA_Opt_String:SetText("has earned the achievement %a!")</OnClick>
+					<OnClick>ACAN.OnWidgetUsed(self)</OnClick>
 				</Scripts>
 			</Button>
 		</Frames>
