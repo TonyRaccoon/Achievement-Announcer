@@ -1,0 +1,8 @@
+## Interface: 50400
+## Title: Achievement Announcer
+## Notes: Sends a message to selected chat channels when you earn an achievement
+## Author: Foxthorn
+## Version: 1.15
+## SavedVariables: AA_Settings
+AchievementAnnouncer.lua
+AchievementAnnouncer.xml
