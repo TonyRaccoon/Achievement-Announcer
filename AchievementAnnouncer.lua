@@ -38,8 +38,13 @@ function ACAN.OnEvent(self, event, ...)		-- Fired when a registered event is fir
 			local channels = { strsplit(",",AA_Settings.custom_channels:gsub("%s+","")) }
 			for _,v in pairs(channels) do
 				local id,name = GetChannelName(v)
-				if id and not name:find("^Trade - ") and not name:find("^General - ") and not name:find("^LocalDefense - ") then -- No Trade, General, or LocalDefense
-					SendChatMessage(ACAN.GetOutputString(achLink), "CHANNEL", nil, id)
+				
+				if name then
+					if id and not name:find("^Trade - ") and not name:find("^General - ") and not name:find("^LocalDefense - ") then -- No Trade, General, or LocalDefense
+						SendChatMessage(ACAN.GetOutputString(achLink), "CHANNEL", nil, id)
+					end
+				else
+					ACAN.Msg("Channel '"..v.."' not found!")
 				end
 			end
 		end
