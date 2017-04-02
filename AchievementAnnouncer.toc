@@ -1,9 +1,9 @@
-## Interface: 70100
+## Interface: 70200
 ## Title: Achievement Announcer
 ## Notes: Sends a message to selected chat channels when you earn an achievement
 ## Author: Foxthorn
-## Version: 1.2.5
-## X-Date: December 8, 2016
+## Version: 1.2.6
+## X-Date: April 2, 2017
 ## SavedVariables: AA_Settings
 AchievementAnnouncer.lua
 AchievementAnnouncer.xml
